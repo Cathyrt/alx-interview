@@ -2,56 +2,52 @@
 
 const request = require('request');
 
-
 const movieId = process.argv[2];
+const filmEndPoint = 'https://swapi-api.alx-tools.com/api/films/' + movieId;
+let people = [];
+const names = [];
 
-if (!movieId) {
-  console.error('Please provide a movie ID as a command line argument.');
-  process.exit(1);
-}
+const requestCharacters = async () => {
+  await new Promise(resolve => request(filmEndPoint, (err, res, body) => {
+    if (err || res.statusCode !== 200) {
+      console.error('Error: ', err, '| StatusCode: ', res.statusCode);
+    } else {
+      const jsonBody = JSON.parse(body);
+      people = jsonBody.characters;
+      resolve();
+    }
+  }));
+};
 
-
-request.get(`https://swapi-api.alx-tools.com/api/films/${movieId}`, (error, response, body) => {
-  if (error) {
-    console.error('Error making API request:', error);
-    process.exit(1);
-  }
-
-  if (response.statusCode !== 200) {
-    console.error('API request failed with status code:', response.statusCode);
-    process.exit(1);
-  }
-
-  const movie = JSON.parse(body);
-
-  
-  const characters = movie.characters;
-  const characterPromises = characters.map((characterUrl) => {
-    return new Promise((resolve, reject) => {
-      request.get(characterUrl, (error, response, body) => {
-        if (error) {
-          reject(error);
+const requestNames = async () => {
+  if (people.length > 0) {
+    for (const p of people) {
+      await new Promise(resolve => request(p, (err, res, body) => {
+        if (err || res.statusCode !== 200) {
+          console.error('Error: ', err, '| StatusCode: ', res.statusCode);
+        } else {
+          const jsonBody = JSON.parse(body);
+          names.push(jsonBody.name);
+          resolve();
         }
+      }));
+    }
+  } else {
+    console.error('Error: Got no Characters for some reason');
+  }
+};
 
-        if (response.statusCode !== 200) {
-          reject(new Error(`API request failed with status code: ${response.statusCode}`));
-        }
+const getCharNames = async () => {
+  await requestCharacters();
+  await requestNames();
 
-        const character = JSON.parse(body);
-        resolve(character.name);
-      });
-    });
-  });
+  for (const n of names) {
+    if (n === names[names.length - 1]) {
+      process.stdout.write(n);
+    } else {
+      process.stdout.write(n + '\n');
+    }
+  }
+};
 
-
-  Promise.all(characterPromises)
-    .then((characterNames) => {
-      characterNames.forEach((name) => {
-        console.log(name);
-      });
-    })
-    .catch((error) => {
-      console.error('Error fetching character details:', error);
-      process.exit(1);
-    });
-});
+getCharNames();
